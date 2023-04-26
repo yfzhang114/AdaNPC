@@ -1,0 +1,13 @@
+/sweep
+/sweep_drm
+/sweep_drm_entropy
+/train_output
+/test_log
+/models
+/sweepERM
+/sweep_hparam
+
+*.out
+*.pyc
+*.pt
+*.pth
