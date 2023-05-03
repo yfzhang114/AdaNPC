@@ -115,6 +115,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Domain generalization')
     parser.add_argument('--input_dir', type=str, default='sweep_drm/880c3514b40d0a15759a09b3741697b0')
     parser.add_argument('--adapt_algorithm', type=str, default="DRM")
+    parser.add_argument('--test_valid', type=str, default='0')
     args_in = parser.parse_args()
 
     epochs_path = os.path.join(args_in.input_dir, 'results.jsonl')
@@ -137,6 +138,10 @@ if __name__ == "__main__":
     args.output_dir = args.input_dir
     
     alg_name = args_in.adapt_algorithm
+    
+    valid = "test" if int(args_in.test_valid) > 0 else "train"
+    ckpt_name = "OOD_best.pkl" if int(args_in.test_valid) > 0 else "IID_best.pkl"
+    print(valid, ckpt_name)
 
     if args.adapt_algorithm in['T3A', 'TentPreBN', 'TentClf', 'PLClf', 'DRM', 'AdaNPC', 'AdaNPCBN']:
         use_featurer_cache = True
