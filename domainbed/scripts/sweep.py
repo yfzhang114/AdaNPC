@@ -279,6 +279,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_trials', type=int, default=3)
     parser.add_argument('--command_launcher', type=str, required=True)
     parser.add_argument('--steps', type=int, default=None)
+    parser.add_argument('--test_valid', type=int, default=1)
     parser.add_argument('--hparams', type=str, default=None)
     parser.add_argument('--holdout_fraction', type=float, default=0.2)
     parser.add_argument('--single_test_envs', action='store_true')
@@ -351,33 +352,21 @@ if __name__ == "__main__":
         Job.launch(to_launch, launcher_fn)
 
     elif args.command in ['unsupervised_adaptation', 'unsup_adapt']:
-        if 'DRM' not in args.algorithms:
-            if 'BN' not in args.hparams:
-                methods = ['AdaNPC']
-                # methods = [
-                #     'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
-                #     'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM', 'AdaNPC'
-                #     ]
-            else:
-                methods = ['AdaNPC']
-                # methods = [
-                #     'TentFull', 'TentNorm', 'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
-                #     'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM']
-        else:
-            methods = [  'DRM', 'DRMFull']
-        print('evluate method', methods)
+        methods = [
+            'AdaNPC', "AdaNPCBN"
+            ]
         jobs = []
         for method in methods:
             jobs += [UAJob(
                 train_args, args.output_dir,
-                adapt_algorithm=method) for train_args in args_list]
+                adapt_algorithm=method, test_valid=args.test_valid) for train_args in args_list]
             # jobs += [UAJob(
             #     train_args, args.output_dir,
-            #     adapt_algorithm='{}-{}'.format(method, '8'))
+            #     adapt_algorithm='{}-{}'.format(method, '4'), test_valid=args.test_valid)
             #     for train_args in args_list]
             # jobs += [UAJob(
             #     train_args, args.output_dir,
-            #     adapt_algorithm='{}-{}'.format(method, '64'))
+            #     adapt_algorithm='{}-{}'.format(method, '1'), test_valid=args.test_valid)
             #     for train_args in args_list]
 
         for job in jobs:
