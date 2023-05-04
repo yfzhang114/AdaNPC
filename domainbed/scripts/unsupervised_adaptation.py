@@ -112,10 +112,10 @@ def accuracy_ent(network, loader, weights, device, adapt=False):
 
 
 if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
     parser = argparse.ArgumentParser(description='Domain generalization')
-    parser.add_argument('--input_dir', type=str, default='sweep_drm/880c3514b40d0a15759a09b3741697b0')
-    parser.add_argument('--adapt_algorithm', type=str, default="DRM")
-    parser.add_argument('--test_valid', type=str, default='0')
+    parser.add_argument('--input_dir', type=str, default='/data1/yifan.zhang/DADG/Test-time-adapt/sweep/resnet18/3953f7204231be65136920f0e220c778')
+    parser.add_argument('--adapt_algorithm', type=str, default="AdaNPC")
     args_in = parser.parse_args()
 
     epochs_path = os.path.join(args_in.input_dir, 'results.jsonl')
@@ -138,10 +138,6 @@ if __name__ == "__main__":
     args.output_dir = args.input_dir
     
     alg_name = args_in.adapt_algorithm
-    
-    valid = "test" if int(args_in.test_valid) > 0 else "train"
-    ckpt_name = "OOD_best.pkl" if int(args_in.test_valid) > 0 else "IID_best.pkl"
-    print(valid, ckpt_name)
 
     if args.adapt_algorithm in['T3A', 'TentPreBN', 'TentClf', 'PLClf', 'DRM', 'AdaNPC', 'AdaNPCBN']:
         use_featurer_cache = True
@@ -377,8 +373,7 @@ if __name__ == "__main__":
         adapt_hparams_dict = {
             'beta': [0.0, 0.25, 0.75,  1.1],
             'k': [1, 5],
-            'gamma': [1, 3], 
-            'alpha': [0.1, 1.0, 10.0],
+            'eps_ball': [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.5],# an increasing eps?0.95, 0.9,
             'temperature': [0.01, 0.05, 0.1, 0.25, 0.5]
         }
     elif args.adapt_algorithm in ['SHOT', 'SHOTIM']:
@@ -391,6 +386,8 @@ if __name__ == "__main__":
     else:
         raise Exception("Not Implemented Error")
     product = [x for x in itertools.product(*adapt_hparams_dict.values())]
+    class_num = [torch.sum(adapted_algorithm.classifier.memory_label==i).item() for i in range(adapted_algorithm.classifier.classes)]
+    print(class_num, adapted_algorithm.classifier.memory_label.shape[0])
     adapt_hparams_list = [dict(zip(adapt_hparams_dict.keys(), r)) for r in product]
     results_on_test, ent_on_test = [], []
     for adapt_hparams in adapt_hparams_list:
@@ -414,7 +411,7 @@ if __name__ == "__main__":
             acc, ent = accuracy_ent(adapted_algorithm, loader, weights, device, adapt=True)
             results[name+'_acc'] = acc
             results[name+'_ent'] = ent
-            if 'out' in name and str(args.test_envs[0]) in name:
+            if 'in' in name and str(args.test_envs[0]) in name:
                 results_on_test.append(acc)
                 ent_on_test.append(acc)
             adapted_algorithm.reset()
@@ -423,6 +420,8 @@ if __name__ == "__main__":
         acc, ent = accuracy_ent(adapted_algorithm, loader, weights, device, adapt=True)
         results[name+'_acc'] = acc
         results[name+'_ent'] = ent
+        results_on_test.append(acc)
+        ent_on_test.append(acc)
 
         del adapt_hparams['cached_loader']
         results_keys = sorted(results.keys())
@@ -449,3 +448,5 @@ if __name__ == "__main__":
     # create done file
     with open(os.path.join(args.output_dir, 'done_{}'.format(alg_name)), 'w') as f:
         f.write('done')
+
+        
