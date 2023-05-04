@@ -153,28 +153,28 @@ class UAJob:
     PRETRAINED = 'Pretrained'
     DONE = 'Done'
 
-    def __init__(self, train_args, sweep_output_dir, adapt_algorithm):
+    def __init__(self, train_args, sweep_output_dir, adapt_algorithm, test_valid=0):
+        valid = "test" if test_valid else "train"
         args_str = json.dumps(train_args, sort_keys=True)
         args_hash = hashlib.md5(args_str.encode('utf-8')).hexdigest()
         self.output_dir = os.path.join(sweep_output_dir, args_hash)
-        print(self.output_dir)
-        print(os.path.exists(os.path.join(self.output_dir, 'done')))
         self.adapt_algorithm = adapt_algorithm
         self.train_args = copy.deepcopy(train_args)
         self.train_args['output_dir'] = self.output_dir
         command = [
             'python', '-m', 'domainbed.scripts.unsupervised_adaptation',
             '--input_dir', self.train_args['output_dir'], 
-            '--adapt_algorithm', adapt_algorithm
+            '--adapt_algorithm', adapt_algorithm,
+            '--test_valid', str(test_valid),
         ]
         self.command_str = ' '.join(command)
 
         if os.path.exists(os.path.join(self.output_dir, 'done')):
-            if os.path.exists(os.path.join(self.output_dir, 'done_{}'.format(adapt_algorithm))):
+            if os.path.exists(os.path.join(self.output_dir, 'done_{}_{}'.format(adapt_algorithm, valid))):
                 self.state = UAJob.DONE
             else:
                 self.state = UAJob.PRETRAINED
-        elif os.path.exists(os.path.join(self.output_dir, 'results_{}.jsonl'.format(adapt_algorithm))):
+        elif os.path.exists(os.path.join(self.output_dir, 'results_{}_{}.jsonl'.format(adapt_algorithm, valid))):
             self.state = UAJob.INCOMPLETE
         else:
             self.state = UAJob.NOT_LAUNCHED
@@ -353,14 +353,16 @@ if __name__ == "__main__":
     elif args.command in ['unsupervised_adaptation', 'unsup_adapt']:
         if 'DRM' not in args.algorithms:
             if 'BN' not in args.hparams:
-                methods = [
-                    'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
-                    'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM', 'AdaNPC'
-                    ]
+                methods = ['AdaNPC']
+                # methods = [
+                #     'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
+                #     'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM', 'AdaNPC'
+                #     ]
             else:
-                methods = [
-                    'TentFull', 'TentNorm', 'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
-                    'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM']
+                methods = ['AdaNPC']
+                # methods = [
+                #     'TentFull', 'TentNorm', 'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
+                #     'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM']
         else:
             methods = [  'DRM', 'DRMFull']
         print('evluate method', methods)
@@ -369,14 +371,14 @@ if __name__ == "__main__":
             jobs += [UAJob(
                 train_args, args.output_dir,
                 adapt_algorithm=method) for train_args in args_list]
-            jobs += [UAJob(
-                train_args, args.output_dir,
-                adapt_algorithm='{}-{}'.format(method, '8'))
-                for train_args in args_list]
-            jobs += [UAJob(
-                train_args, args.output_dir,
-                adapt_algorithm='{}-{}'.format(method, '64'))
-                for train_args in args_list]
+            # jobs += [UAJob(
+            #     train_args, args.output_dir,
+            #     adapt_algorithm='{}-{}'.format(method, '8'))
+            #     for train_args in args_list]
+            # jobs += [UAJob(
+            #     train_args, args.output_dir,
+            #     adapt_algorithm='{}-{}'.format(method, '64'))
+            #     for train_args in args_list]
 
         for job in jobs:
             print(job)
