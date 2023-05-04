@@ -448,5 +448,5 @@ if __name__ == "__main__":
     print("best acc on test {:.1f}".format(results_on_test[idx]*100))
     print("best acc with ent {:.1f}".format(ent_on_test[idx]))
     # create done file
-    with open(os.path.join(args.output_dir, 'done_{}'.format(alg_name)), 'w') as f:
+    with open(os.path.join(args.output_dir, 'done_{}_{}'.format(alg_name, valid)), 'w') as f:
         f.write('done')
