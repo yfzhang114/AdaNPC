@@ -113,8 +113,8 @@ def accuracy_ent(network, loader, weights, device, adapt=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Domain generalization')
-    parser.add_argument('--input_dir', type=str, default='sweep_drm/880c3514b40d0a15759a09b3741697b0')
-    parser.add_argument('--adapt_algorithm', type=str, default="DRM")
+    parser.add_argument('--input_dir', type=str, default='sweep_hparam/PACS/ERMNP/0a6f327553bc29776b7ad3faaae32508')
+    parser.add_argument('--adapt_algorithm', type=str, default="KNNRetrainPara2")
     parser.add_argument('--test_valid', type=str, default='0')
     args_in = parser.parse_args()
 
@@ -134,16 +134,16 @@ if __name__ == "__main__":
     else:
         args.adapt_algorithm = args_in.adapt_algorithm
         args.test_batch_size = 32  # default
-
+        
     args.output_dir = args.input_dir
     
     alg_name = args_in.adapt_algorithm
-    
+
     valid = "test" if int(args_in.test_valid) > 0 else "train"
     ckpt_name = "OOD_best.pkl" if int(args_in.test_valid) > 0 else "IID_best.pkl"
     print(valid, ckpt_name)
 
-    if args.adapt_algorithm in['T3A', 'TentPreBN', 'TentClf', 'PLClf', 'DRM', 'AdaNPC', 'AdaNPCBN']:
+    if args.adapt_algorithm in['T3A', 'TentPreBN', 'TentClf', 'PLClf', 'DRM', 'KNN', 'KNNEPS', 'KNNRetrainPara2']:
         use_featurer_cache = True
     else:
         use_featurer_cache = False
@@ -154,8 +154,8 @@ if __name__ == "__main__":
     # every once in a while, and then load them from disk here.
     algorithm_dict = None
     # os.makedirs(args.output_dir, exist_ok=True)
-    sys.stdout = misc.Tee(os.path.join(args.output_dir, 'out_{}.txt'.format(alg_name)))
-    sys.stderr = misc.Tee(os.path.join(args.output_dir, 'err_{}.txt'.format(alg_name)))
+    sys.stdout = misc.Tee(os.path.join(args.output_dir, 'out_{}_{}.txt'.format(alg_name, valid)))
+    sys.stderr = misc.Tee(os.path.join(args.output_dir, 'err_{}_{}.txt'.format(alg_name, valid)))
 
     print("Environment:")
     print("\tPython: {}".format(sys.version.split(" ")[0]))
@@ -167,6 +167,8 @@ if __name__ == "__main__":
     print("\tPIL: {}".format(PIL.__version__))
 
     print('Args:')
+    for k, v in sorted(vars(args_in).items()):
+        print('\t{}: {}'.format(k, v))
     for k, v in sorted(vars(args).items()):
         print('\t{}: {}'.format(k, v))
 
@@ -183,7 +185,7 @@ if __name__ == "__main__":
         print('\t{}: {}'.format(k, v))
 
     assert os.path.exists(os.path.join(args.output_dir, 'done'))
-    assert os.path.exists(os.path.join(args.output_dir, 'IID_best.pkl'))  # IID_best is produced by train.py
+    assert os.path.exists(os.path.join(args.output_dir, ckpt_name))
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -288,15 +290,18 @@ if __name__ == "__main__":
     checkpoint_vals = collections.defaultdict(lambda: [])
 
     # load trained model
-    ckpt = torch.load(os.path.join(args.output_dir, 'IID_best.pkl'))
+    ckpt = torch.load(os.path.join(args.output_dir, ckpt_name))
     algorithm_dict = ckpt['model_dict']
     if algorithm_dict is not None:
-        algorithm.load_state_dict(algorithm_dict)
+        if 'KNN' in args.adapt_algorithm:
+            algorithm.load_state_dict(algorithm_dict, strict=False)
+        else:
+            algorithm.load_state_dict(algorithm_dict)
 
     last_results_keys = None
     adapt_algorithm_class = adapt_algorithms.get_algorithm_class(
         args.adapt_algorithm)
-    if 'AdaNPC' in args.adapt_algorithm:
+    if 'KNN' in args.adapt_algorithm:
         adapt_hparams = {
             'beta': 0.1,
             'k': 100,
@@ -307,19 +312,7 @@ if __name__ == "__main__":
             len(dataset) - len(args.test_envs), adapt_hparams, algorithm
         )
         adapted_algorithm.to(device)
-    # # Evaluate base model
-    print("Base model's results")
-    results = {}
-    evals = zip(eval_loader_names, eval_loaders, eval_weights)
-    for name, loader, weights in evals:
-        acc, ent = accuracy_ent(algorithm, loader, weights, device, adapt=None)
-        results[name+'_acc'] = acc
-        results[name+'_ent'] = ent
-    results_keys = sorted(results.keys())
-    misc.print_row(results_keys, colwidth=12)
-    misc.print_row([results[key] for key in results_keys], colwidth=12)
-    # exit()
-    print("\nAfter {}".format(alg_name))
+
     # Cache the inference results
     if use_featurer_cache:
         original_evals = zip(eval_loader_names, eval_loaders, eval_weights)
@@ -328,19 +321,35 @@ if __name__ == "__main__":
             if args.algorithm == 'DRM':
                 algorithm.classifier = algorithm.classifier_list[-1]
             loader1, loader2, ent, z, y = generate_featurelized_loader(loader, network=algorithm.featurizer, classifier=algorithm.classifier, batch_size=32)
-            if 'AdaNPC' in args.adapt_algorithm and str(args.test_envs[0]) not in name:
+            if 'KNN' in args.adapt_algorithm and str(args.test_envs[0]) not in name and 'out' not in name:
                 adapted_algorithm.classifier.extend_test(z.to(device), y.to(device))
             loaders.append((name, loader1, weights))
-        if 'AdaNPC' in args.adapt_algorithm:
+        if 'KNN' in args.adapt_algorithm:
             adapted_algorithm.classifier.queue_size = adapted_algorithm.classifier.memory.shape[0]
     else:
         loaders = zip(eval_loader_names, eval_loaders, eval_weights)
-    
+
+    # Evaluate base model
+    print("Base model's results")
+    results = {}
+    evals = zip(eval_loader_names, eval_loaders, eval_weights)
+    if 'KNN' in args.adapt_algorithm:
+        algorithm.eval_knn = copy.deepcopy(adapted_algorithm.classifier)
+    for name, loader, weights in evals:
+        acc, ent = accuracy_ent(algorithm, loader, weights, device, adapt=None)
+        results[name+'_acc'] = acc
+        # results[name+'_ent'] = ent
+    results_keys = sorted(results.keys())
+    misc.print_row(results_keys, colwidth=12)
+    misc.print_row([results[key] for key in results_keys], colwidth=12)
+    # exit()
+    print("\nAfter {}".format(alg_name))
+
     evals = []
     for name, loader, weights in loaders:
         if name in ['env{}_in'.format(i) for i in args.test_envs]:
             train_loader = (name, loader, weights)
-        elif name in ['env{}_out'.format(i) for i in args.test_envs]:
+        else:
             evals.append((name, loader, weights))
     
     if args.adapt_algorithm in ['T3A']:
@@ -367,19 +376,26 @@ if __name__ == "__main__":
             'label': ['own', 'last', 'uniform', 'drm'] #['own', 'last', 'uniform', 'drm']
             #'gamma': [-1, 0., 0.5, 1.0, 5.0, 10.0, 50.0]
         }
-    elif args.adapt_algorithm in ['AdaNPC']:
+    elif args.adapt_algorithm in ['KNN']:
         adapt_hparams_dict = {
             'beta': [0.0, 0.25, 0.75, 1.1],
             'k': [1, 5, 10, 25, 50, 75, 100, 150, 200],
-            'temperature': [0.01, 0.05, 0.1, 0.25, 0.5]
+            'temperature': [0.01, 0.1, 0.25, 0.5]
         }
-    elif args.adapt_algorithm in ['AdaNPCBN']:
+    elif args.adapt_algorithm in ['KNNEPS']:
         adapt_hparams_dict = {
             'beta': [0.0, 0.25, 0.75,  1.1],
             'k': [1, 5],
-            'gamma': [1, 3], 
+            'eps_ball': [0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.5],# an increasing eps?0.95, 0.9,
+            'temperature': [0.01, 0.1, 0.25, 0.5]
+        }
+    elif args.adapt_algorithm in ['KNNRetrainPara2']:
+        adapt_hparams_dict = {
+            'beta': [0.0, 0.25, 0.75, 1.1],
+            'k': [1, 5, 10, 25, 50, 75, 100, 150, 200],
+            'temperature': [0.01, 0.1, 0.25, 0.5],
             'alpha': [0.1, 1.0, 10.0],
-            'temperature': [0.01, 0.05, 0.1, 0.25, 0.5]
+            'gamma': [1, 3], 
         }
     elif args.adapt_algorithm in ['SHOT', 'SHOTIM']:
         adapt_hparams_dict = {
@@ -396,14 +412,16 @@ if __name__ == "__main__":
     for adapt_hparams in adapt_hparams_list:
         adapt_hparams['cached_loader'] = use_featurer_cache
         adapt_hparams['step'] = step+1; step += 1
-        if 'AdaNPC' not in args.adapt_algorithm:
+        if 'KNN' not in args.adapt_algorithm:
             adapted_algorithm = adapt_algorithm_class(dataset.input_shape, dataset.num_classes,
                 len(dataset) - len(args.test_envs), adapt_hparams, algorithm
             )
             # adapted_algorithm = DataParallelPassthrough(adapted_algorithm)
             adapted_algorithm.to(device)
+            
         else:
             adapted_algorithm.reset_params(adapt_hparams)
+            adapted_algorithm.reset()
         
         results = adapt_hparams
 
@@ -412,18 +430,17 @@ if __name__ == "__main__":
 
         # ## Usual evaluation
         for name, loader, weights in evals:
-            acc, ent = accuracy_ent(adapted_algorithm, loader, weights, device, adapt=True)
-            results[name+'_acc'] = acc
-            results[name+'_ent'] = ent
-            if 'out' in name and str(args.test_envs[0]) in name:
-                results_on_test.append(acc)
-                ent_on_test.append(acc)
-            adapted_algorithm.reset()
+            if 'in' in name and 'KNN' in args.adapt_algorithm:
+                results[name+'_acc'] = 1.0 # training distribution in split makes no difference on the final ood result
+            else:
+                acc, ent = accuracy_ent(adapted_algorithm, loader, weights, device, adapt=True)
+                results[name+'_acc'] = acc
+                adapted_algorithm.reset()
 
         name, loader, weights = train_loader
         acc, ent = accuracy_ent(adapted_algorithm, loader, weights, device, adapt=True)
         results[name+'_acc'] = acc
-        results[name+'_ent'] = ent
+        results_on_test.append(acc)
 
         del adapt_hparams['cached_loader']
         results_keys = sorted(results.keys())
@@ -446,7 +463,6 @@ if __name__ == "__main__":
     results_on_test, ent_on_test = np.array(results_on_test), np.array(ent_on_test)
     idx = np.argmax(results_on_test)
     print("best acc on test {:.1f}".format(results_on_test[idx]*100))
-    print("best acc with ent {:.1f}".format(ent_on_test[idx]))
     # create done file
     with open(os.path.join(args.output_dir, 'done_{}_{}'.format(alg_name, valid)), 'w') as f:
         f.write('done')
