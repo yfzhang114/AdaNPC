@@ -1,6 +1,8 @@
 # AdaNPC: Exploring Non-Parametric Classifier for Test-Time Adaptation
 
-This codebase is the official implementation of [`AdaNPC: Exploring Non-Parametric Classifier for Test-Time Adaptation`](https://arxiv.org/abs/2304.12566) (ICML, 2023). 
+This codebase is the official implementation of [`AdaNPC: Exploring Non-Parametric Classifier for Test-Time Adaptation`](https://arxiv.org/abs/2304.12566) (**ICML, 2023**), and  [`Domain-Specific Risk Minimization for Out-of-Distribution Generalization
+`](https://arxiv.org/abs/2208.08661) (**SIGKDD, 2023**)
+
 This codebase is mainly based on [DomainBed](https://github.com/facebookresearch/DomainBed), and [T3A](https://github.com/matsuolab/T3A).
 
 ## Installation
@@ -65,7 +67,7 @@ This scripts will produce a new file in `/my/pretrain/path`, whose name is `resu
 * Hybrid ViT (HViT)
 * MLP-Mixer (Mixer-L16)
 
-## Reproducing results
+## Reproducing results for AdaNPC
 #### Table 1 and Figure 2 (Tuned ERM and CORAL)
 
 You can use `scripts/hparam_search.sh`. Specifically, for each dataset and base algorithm, you can just type a following command.
@@ -99,8 +101,16 @@ for baselines based on KNN training algorithm
 
 ```
 sh scripts/launch.sh pretrain resnet50 10 3 local KNN
-sh scripts/launch.sh sup resnet50 10 3 local KNN
-sh scripts/launch.sh unsup resnet50 10 3 local KNN
+sh scripts/launch.sh sup resnet50 10 3 local AdaNPC
+sh scripts/launch.sh unsup resnet50 10 3 local AdaNPC
+```
+
+## Reproducing results for DRM
+
+```
+sh scripts/launch.sh pretrain resnet50 10 3 local DRM
+sh scripts/launch.sh sup resnet50 10 3 local DRM
+sh scripts/launch.sh unsup resnet50 10 3 local DRM
 ```
 
 ## License
@@ -115,6 +125,15 @@ If you find this repo useful, please consider citing:
       author={Yi-Fan Zhang and Xue Wang and Kexin Jin and Kun Yuan and Zhang Zhang and Liang Wang and Rong Jin and Tieniu Tan},
       year={2023},
       eprint={2304.12566},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+
+@misc{zhang2022domainspecific,
+      title={Domain-Specific Risk Minimization for Out-of-Distribution Generalization}, 
+      author={Yi-Fan Zhang and Jindong Wang and Jian Liang and Zhang Zhang and Baosheng Yu and Liang Wang and Dacheng Tao and Xing Xie},
+      year={2022},
+      eprint={2208.08661},
       archivePrefix={arXiv},
       primaryClass={cs.LG}
 }
