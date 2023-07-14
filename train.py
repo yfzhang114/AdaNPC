@@ -27,9 +27,9 @@ from domainbed.lib.query import Q
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Domain generalization')
-    parser.add_argument('--data_dir', type=str, default='/data1/yifan.zhang/datasets/')
-    parser.add_argument('--dataset', type=str, default="TerraIncognita")
-    parser.add_argument('--algorithm', type=str, default="ERM")
+    parser.add_argument('--data_dir', type=str, default='/data2/yifan.zhang/datasets/DGdata/')
+    parser.add_argument('--dataset', type=str, default="ColoredMNIST")
+    parser.add_argument('--algorithm', type=str, default="KNN")
     parser.add_argument('--task', type=str, default="domain_generalization",
         help='domain_generalization | domain_adaptation')
     parser.add_argument('--hparams', type=str,
@@ -158,6 +158,13 @@ if __name__ == "__main__":
         num_workers=dataset.N_WORKERS)
         for i, (env, env_weights) in enumerate(uda_splits)
         if i in args.test_envs]
+    
+    train_loaders_eval = [FastDataLoader(
+            dataset=env,
+            batch_size=64,
+            num_workers=dataset.N_WORKERS)
+            for i, (env, env_weights) in enumerate(in_splits)
+            if i not in args.test_envs]
 
     eval_loaders = [FastDataLoader(
         dataset=env,
@@ -185,6 +192,10 @@ if __name__ == "__main__":
     else:
         for m in algorithm.children():
             m = DataParallelPassthrough(m)
+    
+    if args.algorithm == 'KNN': 
+        from domainbed.knn import MomentumQueue
+        algorithm.eval_knn = MomentumQueue(algorithm.featurizer.n_outputs, sum([len(loader) for loader in train_loaders_eval]) * 64, 0.1, hparams['k'], dataset.num_classes).cuda() 
 
     train_minibatches_iterator = zip(*train_loaders)
     uda_minibatches_iterator = zip(*uda_loaders)
@@ -209,7 +220,7 @@ if __name__ == "__main__":
         torch.save(save_dict, os.path.join(args.output_dir, filename))
 
 
-    last_results_keys = None
+    last_results_keys, best_test_acc = None, 0
     for step in range(start_step, n_steps):
         step_start_time = time.time()
         minibatches_device = [(x.to(device), y.to(device))
@@ -233,12 +244,28 @@ if __name__ == "__main__":
 
             for key, val in checkpoint_vals.items():
                 results[key] = np.mean(val)
-
-            evals = zip(eval_loader_names, eval_loaders, eval_weights)
-            for name, loader, weights in evals:
-                acc = misc.accuracy(algorithm, loader, weights, device)
-                results[name+'_acc'] = acc
                 
+            evals = zip(eval_loader_names, eval_loaders, eval_weights)
+
+            if args.algorithm == 'KNN':
+                for loader in train_loaders_eval:
+                    for x,y in loader:
+                        algorithm.eval_knn.update_queue(algorithm.featurizer(x.to(device)), y.to(device))
+                if step == 0:
+                    algorithm.eval_knn.queue_size = algorithm.eval_knn.memory.shape[0]
+
+            for name, loader, weights in evals:
+                if args.algorithm == 'KNN':
+                    algorithm.eval_knn.memory = algorithm.eval_knn.memory[:algorithm.eval_knn.queue_size,:]# drop last
+                    algorithm.eval_knn.memory_label = algorithm.eval_knn.memory_label[:algorithm.eval_knn.queue_size]
+                    acc = misc.accuracy(algorithm, loader, weights, device)
+                else:
+                    acc = misc.accuracy(algorithm, loader, weights, device)
+                results[name+'_acc'] = acc
+                if 'in' in name and str(args.test_envs[0]) in name and acc > best_test_acc:
+                    best_test_acc = acc 
+                    save_checkpoint("OOD_best.pkl")
+                    algorithm.to(device)
 
             results_keys = sorted(results.keys())
             if results_keys != last_results_keys:

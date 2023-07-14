@@ -220,7 +220,7 @@ if __name__ == "__main__":
         torch.save(save_dict, os.path.join(args.output_dir, filename))
 
 
-    last_results_keys = None
+    last_results_keys, best_test_acc = None, 0
     for step in range(start_step, n_steps):
         step_start_time = time.time()
         minibatches_device = [(x.to(device), y.to(device))

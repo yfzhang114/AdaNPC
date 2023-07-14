@@ -86,11 +86,21 @@ def _hparams(algorithm, dataset, random_seed):
 
     # Dataset-and-algorithm-specific hparam definitions. Each block of code
     # below corresponds to exactly one hparam. Avoid nested conditionals.
-
-    if dataset in SMALL_IMAGES:
-        _hparam('lr', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
+    if algorithm in ['KNN']:
+        _hparam('temperature', 0.1, lambda r: 10**r.uniform(0, 0.5))
+        if dataset in SMALL_IMAGES:
+            _hparam('lr', 0.001, lambda r: 10**r.uniform(-4.5, -2.5))
+            _hparam('queue_size', 1000, lambda r: int(r.choice([500, 1000, 2000, 2500, 3500])))
+            _hparam('k', 10, lambda r: int(r.choice([5, 10, 20, 50, 100, 150]))) # top-k most similar samples
+        else:
+            _hparam('queue_size', 3500, lambda r: int(r.choice([1000, 1500, 2000, 2500, 3500, 5000])))
+            _hparam('k', 150, lambda r: int(r.choice([25, 50, 75, 100, 125, 150, 200, 500]))) # top-k most similar samples
+            _hparam('lr', 0.0001, lambda r: 10**r.uniform(-5, -3.5))
     else:
-        _hparam('lr', 5e-5, lambda r: 10**r.uniform(-5, -3.5))
+        if dataset in SMALL_IMAGES:
+            _hparam('lr', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
+        else:
+            _hparam('lr', 5e-5, lambda r: 10**r.uniform(-5, -3.5))
 
 
     if dataset in SMALL_IMAGES:
