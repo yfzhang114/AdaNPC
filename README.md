@@ -12,9 +12,9 @@ This codebase is mainly based on [DomainBed](https://github.com/facebookresearch
 #### (1) Downlload the datasets
 
 ```sh
-python -m domainbed.scripts.download --data_dir=/my/datasets/path --dataset pacs
+python download.py --data_dir=/my/datasets/path 
 ```
-Note: change `--dataset pacs` for downloading other datasets (e.g., `vlcs`, `office_home`, `terra_incognita`). 
+Note: set the target datasets in the download.py
 
 
 #### (2) Train a model on source domains
