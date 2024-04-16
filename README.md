@@ -120,21 +120,21 @@ This source code is released under the MIT license, included [here](LICENSE).
 ### Citation 
 If you find this repo useful, please consider citing: 
 ```
-@misc{zhang2023adanpc,
-      title={AdaNPC: Exploring Non-Parametric Classifier for Test-Time Adaptation}, 
-      author={Yi-Fan Zhang and Xue Wang and Kexin Jin and Kun Yuan and Zhang Zhang and Liang Wang and Rong Jin and Tieniu Tan},
-      year={2023},
-      eprint={2304.12566},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
+@inproceedings{zhang2023adanpc,
+  title={Adanpc: Exploring non-parametric classifier for test-time adaptation},
+  author={Zhang, Yifan and Wang, Xue and Jin, Kexin and Yuan, Kun and Zhang, Zhang and Wang, Liang and Jin, Rong and Tan, Tieniu},
+  booktitle={International Conference on Machine Learning},
+  pages={41647--41676},
+  year={2023},
+  organization={PMLR}
 }
+
 
 @misc{zhang2022domainspecific,
       title={Domain-Specific Risk Minimization for Out-of-Distribution Generalization}, 
       author={Yi-Fan Zhang and Jindong Wang and Jian Liang and Zhang Zhang and Baosheng Yu and Liang Wang and Dacheng Tao and Xing Xie},
-      year={2022},
-      eprint={2208.08661},
-      archivePrefix={arXiv},
+      year={2023},
+      archivePrefix={KDD '23: Proceedings of the 29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
       primaryClass={cs.LG}
 }
 ```
